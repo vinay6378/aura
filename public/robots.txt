@@ -1,0 +1,18 @@
+User-agent: *
+Allow: /
+Disallow: /admin/
+Disallow: /private/
+Disallow: /api/
+
+# Crawl-delay
+Crawl-delay: 1
+
+# Sitemap
+Sitemap: https://auraofficial.in/sitemap.xml
+
+# Specific bot rules
+User-agent: Googlebot
+Allow: /
+
+User-agent: Bingbot
+Allow: /
