@@ -112,7 +112,7 @@ const TermsOfService = () => {
       content: [
         'Good faith negotiation as first step',
         'Mediation through neutral third party if needed',
-        'Jurisdiction: Courts of Gurugram, India',
+        'Jurisdiction: Courts of Ajmer, India',
         'Arbitration under Indian Arbitration Act',
         'Costs shared equally by both parties',
         'Decision final and binding on both parties'

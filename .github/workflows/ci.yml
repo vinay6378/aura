@@ -12,14 +12,14 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [16.x, 18.x]
+        node-version: [20.x, 22.x]
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
     - name: Setup Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v3
+      uses: actions/setup-node@v4
       with:
         node-version: ${{ matrix.node-version }}
         cache: 'npm'
@@ -39,7 +39,7 @@ jobs:
         CI: true
 
     - name: Upload build artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: build-${{ matrix.node-version }}
         path: build/
@@ -51,7 +51,7 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
     - name: Run npm audit
       run: npm audit --audit-level=moderate
@@ -69,10 +69,10 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
     - name: Setup Node.js
-      uses: actions/setup-node@v3
+      uses: actions/setup-node@v4
       with:
         node-version: '18.x'
         cache: 'npm'
@@ -86,10 +86,17 @@ jobs:
         CI: true
 
     - name: Deploy to staging
+      env:
+        FTP_HOST: ${{ secrets.FTP_HOST_STAGING }}
+        FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+        FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+        FTP_PATH: ${{ secrets.FTP_PATH_STAGING }}
       run: |
-        echo "Deploying to staging environment"
-        # Add your deployment commands here
-        # Example: AWS S3, Netlify, Vercel, etc.
+        echo "Deploying to staging environment via FTP"
+        # Install FTP deployment tool
+        npm install -g ftp-deploy
+        # Deploy via FTP
+        ftp-deploy --host="$FTP_HOST" --user="$FTP_USERNAME" --password="$FTP_PASSWORD" --local="build" --remote="$FTP_PATH"
 
   deploy-production:
     runs-on: ubuntu-latest
@@ -98,10 +105,10 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
     - name: Setup Node.js
-      uses: actions/setup-node@v3
+      uses: actions/setup-node@v4
       with:
         node-version: '18.x'
         cache: 'npm'
@@ -115,7 +122,14 @@ jobs:
         CI: true
 
     - name: Deploy to production
+      env:
+        FTP_HOST: ${{ secrets.FTP_HOST }}
+        FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+        FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+        FTP_PATH: ${{ secrets.FTP_PATH }}
       run: |
-        echo "Deploying to production environment"
-        # Add your deployment commands here
-        # Example: AWS S3, Netlify, Vercel, etc.
+        echo "Deploying to production environment via FTP"
+        # Install FTP deployment tool
+        npm install -g ftp-deploy
+        # Deploy via FTP
+        ftp-deploy --host="$FTP_HOST" --user="$FTP_USERNAME" --password="$FTP_PASSWORD" --local="build" --remote="$FTP_PATH"

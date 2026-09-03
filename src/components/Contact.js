@@ -1,19 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-
-// Local data management
-const saveContactData = (data) => {
-  const existingContacts = JSON.parse(localStorage.getItem('admin_contacts') || '[]');
-  const newContact = {
-    id: existingContacts.length > 0 ? Math.max(...existingContacts.map(c => c.id)) + 1 : 1,
-    ...data,
-    status: 'new',
-    date: new Date().toISOString().split('T')[0]
-  };
-  existingContacts.push(newContact);
-  localStorage.setItem('admin_contacts', JSON.stringify(existingContacts));
-  return true;
-};
+import { submitContactForm } from '../services/dataService';
 
 const Contact = () => {
   const [formData, setFormData] = useState({
@@ -22,6 +9,7 @@ const Contact = () => {
     phone: '',
     company: '',
     subject: '',
+    service: 'General Inquiry',
     message: ''
   });
 
@@ -41,12 +29,11 @@ const Contact = () => {
     setSubmitStatus('Sending...');
 
     try {
-      // Save to localStorage for admin panel
-      const success = saveContactData(formData);
+      const result = await submitContactForm(formData);
       
-      if (success) {
+      if (result.success) {
         setSubmitStatus('Message sent successfully! We\'ll get back to you soon.');
-        setFormData({ name: '', email: '', phone: '', company: '', subject: '', message: '' });
+        setFormData({ name: '', email: '', phone: '', company: '', subject: '', service: 'General Inquiry', message: '' });
         setTimeout(() => setSubmitStatus(''), 5000);
       } else {
         setSubmitStatus('Error sending message. Please try again.');
@@ -160,6 +147,33 @@ const Contact = () => {
                     className="w-full px-4 py-3 rounded-lg bg-white bg-opacity-20 border border-white border-opacity-30 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-aura-cyan transition-all"
                     placeholder="Your Company Name"
                   />
+                </div>
+
+                <div>
+                  <label className="block text-white mb-2" htmlFor="service">
+                    Service Interested In
+                  </label>
+                  <select
+                    id="service"
+                    name="service"
+                    value={formData.service}
+                    onChange={handleChange}
+                    className="w-full px-4 py-3 rounded-lg bg-white bg-opacity-20 border border-white border-opacity-30 text-white focus:outline-none focus:ring-2 focus:ring-aura-cyan transition-all"
+                  >
+                    <option value="General Inquiry">General Inquiry</option>
+                    <option value="Website Development">Website Development</option>
+                    <option value="Software Development">Software Development</option>
+                    <option value="Mobile Application">Mobile Application</option>
+                    <option value="Data Science & Analytics">Data Science & Analytics</option>
+                    <option value="Social Media Marketing">Social Media Marketing</option>
+                    <option value="PPC Advertising">PPC Advertising</option>
+                    <option value="Content Marketing">Content Marketing</option>
+                    <option value="Brand Identity">Brand Identity</option>
+                    <option value="Photo Editing">Photo Editing</option>
+                    <option value="Print Design">Print Design</option>
+                    <option value="Business Content">Business Content</option>
+                    <option value="Book Publishing">Book Publishing</option>
+                  </select>
                 </div>
 
                 <div>

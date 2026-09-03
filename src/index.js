@@ -10,6 +10,8 @@ if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/service-worker.js')
       .then((registration) => {
         console.log('ServiceWorker registration successful');
+        // Force update to clear old cache
+        registration.update();
       })
       .catch((error) => {
         console.log('ServiceWorker registration failed:', error);
@@ -20,7 +22,10 @@ if ('serviceWorker' in navigator) {
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
   <React.StrictMode>
-    <BrowserRouter>
+    <BrowserRouter future={{
+      v7_startTransition: true,
+      v7_relativeSplatPath: true
+    }}>
       <App />
     </BrowserRouter>
   </React.StrictMode>

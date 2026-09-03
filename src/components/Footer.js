@@ -89,12 +89,15 @@ const Footer = () => {
                   key={link.name}
                   to={link.href}
                   className="text-gray-300 hover:text-aura-cyan transition-colors duration-200"
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.5, delay: index * 0.1 }}
-                  whileHover={{ scale: 1.05 }}
                 >
-                  {link.name}
+                  <motion.div
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ duration: 0.5, delay: index * 0.1 }}
+                    whileHover={{ scale: 1.05 }}
+                  >
+                    {link.name}
+                  </motion.div>
                 </Link>
               ))}
             </div>
@@ -114,12 +117,15 @@ const Footer = () => {
                   key={link.name}
                   to={link.href}
                   className="text-gray-300 hover:text-aura-cyan transition-colors duration-200"
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.5, delay: index * 0.1 }}
-                  whileHover={{ scale: 1.05 }}
                 >
-                  {link.name}
+                  <motion.div
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ duration: 0.5, delay: index * 0.1 }}
+                    whileHover={{ scale: 1.05 }}
+                  >
+                    {link.name}
+                  </motion.div>
                 </Link>
               ))}
             </div>
@@ -139,12 +145,15 @@ const Footer = () => {
                   key={link.name}
                   to={link.href}
                   className="text-gray-300 hover:text-aura-cyan transition-colors duration-200"
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.5, delay: index * 0.1 }}
-                  whileHover={{ scale: 1.05 }}
                 >
-                  {link.name}
+                  <motion.div
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ duration: 0.5, delay: index * 0.1 }}
+                    whileHover={{ scale: 1.05 }}
+                  >
+                    {link.name}
+                  </motion.div>
                 </Link>
               ))}
             </div>

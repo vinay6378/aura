@@ -1,9 +1,12 @@
-const CACHE_NAME = 'aura-v1';
+const CACHE_NAME = 'aura-v2'; // Increment version to clear old cache
 const urlsToCache = [
   '/',
   '/about',
   '/services',
   '/contact',
+  '/admin/login',
+  '/admin/signup',
+  '/admin',
   '/manifest.json',
   '/favicon.ico'
 ];
@@ -21,6 +24,12 @@ self.addEventListener('install', (event) => {
 
 // Fetch event - serve from cache, fallback to network
 self.addEventListener('fetch', (event) => {
+  // Don't cache API calls
+  if (event.request.url.includes('/api/')) {
+    event.respondWith(fetch(event.request));
+    return;
+  }
+
   event.respondWith(
     caches.match(event.request)
       .then((response) => {
@@ -60,6 +69,7 @@ self.addEventListener('activate', (event) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
           if (cacheWhitelist.indexOf(cacheName) === -1) {
+            console.log('Deleting old cache:', cacheName);
             return caches.delete(cacheName);
           }
         })

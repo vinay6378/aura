@@ -2,7 +2,7 @@
   "name": "aura-3d-website",
   "version": "1.0.0",
   "private": true,
-  "homepage": "https://auraofficial.in",
+  "homepage": "/",
   "dependencies": {
     "@react-three/drei": "^9.88.13",
     "@react-three/fiber": "^8.15.11",
@@ -11,21 +11,22 @@
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-helmet-async": "^3.0.0",
-    "react-router-dom": "^6.20.1",
+    "react-router-dom": "^6.28.0",
     "react-scripts": "5.0.1",
+    "socket.io-client": "^4.8.3",
     "three": "^0.159.0",
     "web-vitals": "^3.5.0"
   },
   "scripts": {
+    "postinstall": "patch-package",
     "start": "react-scripts start",
-    "build": "react-scripts build",
+    "build": "cross-env DISABLE_ESLINT_PLUGIN=true GENERATE_SOURCEMAP=false react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
   },
   "eslintConfig": {
     "extends": [
-      "react-app",
-      "react-app/jest"
+      "react-app"
     ]
   },
   "browserslist": {
@@ -42,7 +43,12 @@
   },
   "devDependencies": {
     "autoprefixer": "^10.4.16",
-    "postcss": "^8.4.32",
+    "cross-env": "^7.0.3",
+    "patch-package": "^8.0.1",
+    "postcss": "^8.4.31",
     "tailwindcss": "^3.3.6"
+  },
+  "overrides": {
+    "eslint": "8.57.0"
   }
 }
