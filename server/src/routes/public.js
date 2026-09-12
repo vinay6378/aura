@@ -5,48 +5,32 @@ import { SITE_PAGES, buildSitemapXml } from '../lib/seo.js';
 
 const router = Router();
 
-function getIo(req) {
-  return req.app.get('io');
-}
-
 router.post('/contacts', (req, res) => {
   const { name, email, phone, company, subject, service, message } = req.body || {};
   if (!name || !email || !message) {
     return res.status(400).json({ success: false, error: 'Name, email and message are required' });
   }
+
   const info = db.prepare(`
     INSERT INTO contacts (name, email, phone, company, subject, service, message)
     VALUES (?, ?, ?, ?, ?, ?, ?)
   `).run(
-    String(name).slice(0, 120),
-    String(email).slice(0, 180),
-    phone ? String(phone).slice(0, 40) : '',
-    company ? String(company).slice(0, 120) : '',
-    subject ? String(subject).slice(0, 180) : '',
-    service ? String(service).slice(0, 80) : 'General Inquiry',
-    String(message).slice(0, 4000)
+    String(name).trim().slice(0, 120),
+    String(email).trim().toLowerCase().slice(0, 180),
+    phone ? String(phone).trim().slice(0, 40) : '',
+    company ? String(company).trim().slice(0, 120) : '',
+    subject ? String(subject).trim().slice(0, 180) : '',
+    service ? String(service).trim().slice(0, 80) : 'General Inquiry',
+    String(message).trim().slice(0, 4000)
   );
+
   const contact = db.prepare('SELECT * FROM contacts WHERE id = ?').get(info.lastInsertRowid);
-  getIo(req)?.to('admin').emit('lead:new', contact);
-  res.json({ success: true, message: 'Message received' });
+  res.status(201).json({ success: true, message: 'Message received', contact: { id: contact.id, created_at: contact.created_at } });
 });
 
 router.post('/analytics/session', (req, res) => {
-  const {
-    sessionId,
-    visitorId,
-    path,
-    title,
-    referrer,
-    language,
-    timezone,
-    country,
-    utm
-  } = req.body || {};
-
-  if (!sessionId) {
-    return res.status(400).json({ success: false, error: 'sessionId required' });
-  }
+  const { sessionId, visitorId, path, title, referrer, language, timezone, country, utm } = req.body || {};
+  if (!sessionId) return res.status(400).json({ success: false, error: 'sessionId required' });
 
   const ua = req.headers['user-agent'] || '';
   const geo = resolveGeo({ timezone, language, country });
@@ -61,23 +45,9 @@ router.post('/analytics/session', (req, res) => {
         language, timezone, referrer, landing_page, utm_source, utm_medium, utm_campaign
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
-      sessionId,
-      visitorId || sessionId,
-      now,
-      now,
-      geo.country,
-      geo.region,
-      '',
-      device.device,
-      device.browser,
-      device.os,
-      language || '',
-      timezone || '',
-      referrer || '',
-      path || '/',
-      utm?.source || '',
-      utm?.medium || '',
-      utm?.campaign || ''
+      sessionId, visitorId || sessionId, now, now, geo.country, geo.region, '',
+      device.device, device.browser, device.os, language || '', timezone || '', referrer || '',
+      path || '/', utm?.source || '', utm?.medium || '', utm?.campaign || ''
     );
   } else {
     db.prepare("UPDATE sessions SET last_seen = ?, country = COALESCE(NULLIF(country, 'Unknown'), ?) WHERE id = ?")
@@ -85,21 +55,10 @@ router.post('/analytics/session', (req, res) => {
   }
 
   if (path) {
-    db.prepare(`
-      INSERT INTO page_views (session_id, path, title, referrer)
-      VALUES (?, ?, ?, ?)
-    `).run(sessionId, path, title || '', referrer || '');
+    db.prepare(`INSERT INTO page_views (session_id, path, title, referrer) VALUES (?, ?, ?, ?)`)
+      .run(sessionId, String(path).slice(0, 500), String(title || '').slice(0, 200), String(referrer || '').slice(0, 1000));
   }
 
-  const live = {
-    sessionId,
-    path: path || '/',
-    country: geo.country,
-    device: device.device,
-    browser: device.browser,
-    lastSeen: now
-  };
-  getIo(req)?.to('admin').emit('visitor:hit', live);
   res.json({ success: true });
 });
 
@@ -111,24 +70,20 @@ router.post('/analytics/heartbeat', (req, res) => {
   if (durationMs && path) {
     db.prepare(`
       UPDATE page_views SET duration_ms = duration_ms + ?
-      WHERE id = (
-        SELECT id FROM page_views WHERE session_id = ? AND path = ? ORDER BY id DESC LIMIT 1
-      )
-    `).run(Number(durationMs) || 0, sessionId, path);
+      WHERE id = (SELECT id FROM page_views WHERE session_id = ? AND path = ? ORDER BY id DESC LIMIT 1)
+    `).run(Math.max(0, Math.min(Number(durationMs) || 0, 86400000)), sessionId, path);
   }
-  getIo(req)?.to('admin').emit('visitor:heartbeat', { sessionId, path, lastSeen: now });
   res.json({ success: true });
 });
 
 router.post('/analytics/event', (req, res) => {
   const { sessionId, name, payload } = req.body || {};
-  if (!sessionId || !name) return res.status(400).json({ success: false });
+  if (!sessionId || !name) return res.status(400).json({ success: false, error: 'sessionId and name required' });
   db.prepare('INSERT INTO events (session_id, name, payload) VALUES (?, ?, ?)').run(
     sessionId,
     String(name).slice(0, 80),
     JSON.stringify(payload || {})
   );
-  getIo(req)?.to('admin').emit('event:new', { sessionId, name, payload });
   res.json({ success: true });
 });
 
