@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import axios from 'axios';
+import { apiCall } from '../services/dataService';
 
 const AdminLogin = () => {
   const [email, setEmail] = useState('');
@@ -16,17 +16,17 @@ const AdminLogin = () => {
     setLoading(true);
 
     try {
-      // Always use real Python API
-      const res = await axios.post('http://localhost:5000/api/auth', { action: 'login', email, password });
-      if (res.data?.token) {
-        localStorage.setItem('aura_admin_token', res.data.token);
-        localStorage.setItem('aura_admin_user', JSON.stringify(res.data.user));
-        navigate('/admin');
-      } else {
-        setError(res.data?.error || 'Invalid administrator credentials');
-      }
+      const data = await apiCall('/api/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ email, password })
+      });
+
+      if (!data?.token) throw new Error('Invalid administrator credentials');
+      localStorage.setItem('aura_admin_token', data.token);
+      localStorage.setItem('aura_admin_user', JSON.stringify(data.user || {}));
+      navigate('/admin', { replace: true });
     } catch (err) {
-      setError(err.response?.data?.error || 'Invalid administrator credentials');
+      setError(err.message || 'Invalid administrator credentials');
     } finally {
       setLoading(false);
     }
@@ -34,7 +34,7 @@ const AdminLogin = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-950 px-4">
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         className="max-w-md w-full bg-slate-900 border border-slate-800 p-8 rounded-2xl shadow-2xl"
@@ -45,19 +45,21 @@ const AdminLogin = () => {
         </div>
 
         {error && (
-          <div className="p-3.5 mb-6 text-sm text-rose-400 bg-rose-950/40 border border-rose-800/60 rounded-xl text-center">
+          <div role="alert" className="p-3.5 mb-6 text-sm text-rose-400 bg-rose-950/40 border border-rose-800/60 rounded-xl text-center">
             {error}
           </div>
         )}
 
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-gray-300 mb-1.5">
+            <label className="block text-xs font-semibold uppercase tracking-wider text-gray-300 mb-1.5" htmlFor="admin-email">
               Email Address
             </label>
             <input
+              id="admin-email"
               type="email"
               required
+              autoComplete="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="w-full px-4 py-3 bg-slate-800/80 border border-slate-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500 transition"
@@ -66,12 +68,14 @@ const AdminLogin = () => {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-gray-300 mb-1.5">
+            <label className="block text-xs font-semibold uppercase tracking-wider text-gray-300 mb-1.5" htmlFor="admin-password">
               Password
             </label>
             <input
+              id="admin-password"
               type="password"
               required
+              autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full px-4 py-3 bg-slate-800/80 border border-slate-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500 transition"
@@ -82,7 +86,7 @@ const AdminLogin = () => {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3.5 px-4 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-semibold rounded-xl shadow-lg transition duration-200 disabled:opacity-50 mt-2"
+            className="w-full py-3.5 px-4 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-semibold rounded-xl shadow-lg transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed mt-2"
           >
             {loading ? 'Authenticating...' : 'Sign In'}
           </button>
