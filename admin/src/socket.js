@@ -1,16 +1,11 @@
-import { io } from 'socket.io-client';
-
-export function connectRealtime(token, handlers = {}) {
-  const url = import.meta.env.VITE_SOCKET_URL || 'http://localhost:4000';
-  const socket = io(url, {
-    auth: { token },
-    transports: ['websocket', 'polling']
-  });
-
-  socket.on('visitor:hit', handlers.onHit);
-  socket.on('visitor:heartbeat', handlers.onHeartbeat);
-  socket.on('lead:new', handlers.onLead);
-  socket.on('event:new', handlers.onEvent);
-
-  return socket;
+// Shared-hosting-safe realtime helper.
+// The admin dashboard should use short polling/SSE instead of Socket.IO.
+// This compatibility export intentionally performs no WebSocket connection.
+export function connectRealtime(_token, handlers = {}) {
+  return {
+    close() {},
+    disconnect() {},
+    on() {},
+    handlers
+  };
 }
