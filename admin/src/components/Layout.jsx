@@ -10,7 +10,6 @@ import {
   Settings as SettingsIcon,
   Zap
 } from 'lucide-react';
-import { connectRealtime } from '../socket';
 
 const links = [
   { to: '/', label: 'Overview', icon: LayoutDashboard },
@@ -27,29 +26,25 @@ export default function Layout({ children }) {
   const [pulse, setPulse] = useState('');
 
   useEffect(() => {
-    const token = localStorage.getItem('aura_token');
-    const socket = connectRealtime(token, {
-      onHit: (hit) => {
-        setPulse(`${hit.country} · ${hit.path}`);
-        setLiveCount((n) => n + 0);
-      },
-      onLead: () => setPulse('New lead received')
-    });
+    let mounted = true;
 
     const poll = async () => {
       try {
         const { default: api } = await import('../api');
         const { data } = await api.get('/api/admin/live');
+        if (!mounted) return;
         setLiveCount(data.visitors?.length || 0);
+        setPulse(`Live data updated · ${new Date().toLocaleTimeString()}`);
       } catch {
-        /* ignore */
+        if (mounted) setPulse('Live data unavailable');
       }
     };
+
     poll();
     const id = setInterval(poll, 12000);
     return () => {
+      mounted = false;
       clearInterval(id);
-      socket.disconnect();
     };
   }, []);
 
@@ -67,7 +62,7 @@ export default function Layout({ children }) {
           </div>
           <div>
             <p className="font-extrabold tracking-tight">AURA Command</p>
-            <p className="text-xs text-white/50">Realtime ops</p>
+            <p className="text-xs text-white/50">Operations</p>
           </div>
         </div>
         <nav className="space-y-1 flex-1">
@@ -98,7 +93,7 @@ export default function Layout({ children }) {
         <header className="flex items-center justify-between border-b border-line px-4 md:px-8 py-4">
           <div>
             <p className="text-sm text-white/50">AURA Digital · auraofficial.in</p>
-            <p className="text-xs text-cyan h-4">{pulse || 'Listening for live events'}</p>
+            <p className="text-xs text-cyan h-4">{pulse || 'Polling live data'}</p>
           </div>
           <div className="flex items-center gap-2 text-sm">
             <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
