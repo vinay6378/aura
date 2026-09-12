@@ -1,69 +1,39 @@
-// Data Service - Uses Python backend for production and development
-const API_BASE_URL = 'http://localhost:5000/api';
+const API_BASE_URL = (process.env.REACT_APP_API_URL || '').replace(/\/$/, '');
 
-// Contact form submission
-export const submitContactForm = async (formData) => {
-  try {
-    // Use Python API
-    const response = await fetch(`${API_BASE_URL}/contacts`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(formData),
-    });
-    
-    if (!response.ok) {
-      throw new Error('API request failed');
+const request = async (endpoint, options = {}) => {
+  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(options.headers || {})
     }
-    
-    return await response.json();
-  } catch (error) {
-    console.error('API Error:', error);
+  });
+
+  let data = null;
+  try {
+    data = await response.json();
+  } catch {
+    data = null;
+  }
+
+  if (!response.ok) {
+    const error = new Error(data?.error || `API request failed (${response.status})`);
+    error.status = response.status;
     throw error;
   }
+
+  return data;
 };
 
+export const submitContactForm = (formData) => request('/api/public/contacts', {
+  method: 'POST',
+  body: JSON.stringify(formData)
+});
 
-// Get contact data (for admin panel)
-export const getContactData = async (token) => {
-  try {
-    const response = await fetch(`${API_BASE_URL}/contacts`, {
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
-    });
-    
-    if (!response.ok) {
-      throw new Error('API request failed');
-    }
-    
-    return await response.json();
-  } catch (error) {
-    console.error('API Error:', error);
-    throw error;
+export const getContactData = (token) => request('/api/admin/contacts', {
+  headers: {
+    Authorization: `Bearer ${token}`
   }
-};
+});
 
-// Generic API call helper
-export const apiCall = async (endpoint, options = {}) => {
-  try {
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-      ...options,
-      headers: {
-        'Content-Type': 'application/json',
-        ...(options.headers || {}),
-      },
-    });
-    
-    if (!response.ok) {
-      throw new Error('API request failed');
-    }
-    
-    return await response.json();
-  } catch (error) {
-    console.error('API Error:', error);
-    throw error;
-  }
-};
+export const apiCall = (endpoint, options = {}) => request(endpoint, options);
