@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { apiCall } from '../services/dataService';
 
 const AdminSignup = () => {
   const [name, setName] = useState('');
@@ -20,7 +19,7 @@ const AdminSignup = () => {
 
     setLoading(true);
     try {
-      setError('Administrator registration is currently disabled. Use the seeded admin account or configure provisioning on the server.');
+      setError('Administrator registration is currently disabled. Use the provisioned admin account or configure server-side provisioning.');
     } finally {
       setLoading(false);
     }
