@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { apiCall } from '../services/dataService';
+import supabase from '../lib/supabaseClient';
 
 const AdminLogin = () => {
   const [email, setEmail] = useState('');
@@ -16,14 +16,21 @@ const AdminLogin = () => {
     setLoading(true);
 
     try {
-      const data = await apiCall('/auth/login', {
-        method: 'POST',
-        body: JSON.stringify({ email, password })
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
+        email: email.trim().toLowerCase(),
+        password
       });
 
-      if (!data?.token) throw new Error('Invalid administrator credentials');
-      localStorage.setItem('aura_admin_token', data.token);
-      localStorage.setItem('aura_admin_user', JSON.stringify(data.user || {}));
+      if (signInError) throw signInError;
+      if (!data.user) throw new Error('Invalid administrator credentials');
+
+      localStorage.setItem('aura_admin_token', data.session?.access_token || '');
+      localStorage.setItem('aura_admin_user', JSON.stringify({
+        id: data.user.id,
+        email: data.user.email,
+        name: data.user.user_metadata?.name || 'Admin'
+      }));
+
       navigate('/admin', { replace: true });
     } catch (err) {
       setError(err.message || 'Invalid administrator credentials');

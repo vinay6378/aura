@@ -1,15 +1,16 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import supabase from '../lib/supabaseClient';
+import { getContacts, updateContactStatus, deleteContact, getOverviewStats, getLiveVisitors } from '../services/dataService';
 
-const API_URL = process.env.REACT_APP_API_URL || '/api';
 const POLL_INTERVAL = 10000;
 const STATUSES = ['new', 'contacted', 'qualified', 'won', 'closed'];
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('overview');
-  const [overview, setOverview] = useState(null);
+  const [totals, setTotals] = useState({});
+  const [liveVisitors, setLiveVisitors] = useState([]);
   const [contacts, setContacts] = useState([]);
   const [statusFilter, setStatusFilter] = useState('all');
   const [loading, setLoading] = useState(true);
@@ -20,12 +21,8 @@ const AdminDashboard = () => {
   const [knownLeadCount, setKnownLeadCount] = useState(0);
   const pollRef = useRef(null);
 
-  const authHeader = useCallback(() => {
-    const token = localStorage.getItem('aura_admin_token');
-    return { headers: { Authorization: `Bearer ${token}` } };
-  }, []);
-
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
     localStorage.removeItem('aura_admin_token');
     localStorage.removeItem('aura_admin_user');
     navigate('/admin/login');
@@ -33,9 +30,13 @@ const AdminDashboard = () => {
 
   const fetchOverview = useCallback(async () => {
     try {
-      const { data } = await axios.get(`${API_URL}/admin/overview`, authHeader());
-      setOverview(data);
-      const newCount = data.totals?.contacts ?? 0;
+      const [stats, live] = await Promise.all([
+        getOverviewStats(),
+        getLiveVisitors()
+      ]);
+      setTotals(stats);
+      setLiveVisitors(live);
+      const newCount = stats.contacts ?? 0;
       if (newCount > knownLeadCount && knownLeadCount > 0) {
         setRealTimeStatus('live-update');
         setTimeout(() => setRealTimeStatus('connected'), 3000);
@@ -43,20 +44,18 @@ const AdminDashboard = () => {
       setKnownLeadCount(newCount);
       setRealTimeStatus('connected');
     } catch (err) {
-      if (err.response?.status === 401) handleLogout();
       setRealTimeStatus('disconnected');
     }
-  }, [authHeader, knownLeadCount]);
+  }, [knownLeadCount]);
 
   const fetchContacts = useCallback(async () => {
     try {
-      const { data } = await axios.get(`${API_URL}/admin/contacts`, authHeader());
-      setContacts(data.contacts || []);
+      const data = await getContacts(statusFilter);
+      setContacts(data || []);
     } catch (err) {
-      if (err.response?.status === 401) handleLogout();
       setContacts([]);
     }
-  }, [authHeader]);
+  }, [statusFilter]);
 
   const fetchDashboardData = useCallback(async () => {
     setLoading(true);
@@ -76,7 +75,7 @@ const AdminDashboard = () => {
   const handleStatusChange = async (contactId, newStatus) => {
     setActionLoading(true);
     try {
-      await axios.patch(`${API_URL}/admin/contacts/${contactId}`, { status: newStatus }, authHeader());
+      await updateContactStatus(contactId, newStatus);
       fetchContacts();
     } catch {
       alert('Failed to update inquiry status.');
@@ -89,7 +88,7 @@ const AdminDashboard = () => {
     if (!window.confirm('Delete this inquiry permanently?')) return;
     setActionLoading(true);
     try {
-      await axios.delete(`${API_URL}/admin/contacts/${contactId}`, authHeader());
+      await deleteContact(contactId);
       fetchContacts();
       fetchOverview();
     } catch {
@@ -152,7 +151,6 @@ const AdminDashboard = () => {
     }
   };
 
-  const totals = overview?.totals || {};
   const serviceBreakdown = (() => {
     if (!contacts.length) return [];
     const map = {};
@@ -283,11 +281,11 @@ const AdminDashboard = () => {
                     )}
                   </div>
 
-                  {overview?.live?.length > 0 && (
+                  {liveVisitors.length > 0 && (
                     <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
                       <h3 className="text-lg font-bold text-white mb-4">Live Visitors</h3>
                       <ul className="space-y-2 max-h-48 overflow-auto">
-                        {overview.live.map((s) => (
+                        {liveVisitors.map((s) => (
                           <li key={s.id} className="text-sm flex justify-between gap-3">
                             <span>{s.country} · {s.device} · {s.browser}</span>
                             <span className="text-gray-400 truncate">{s.landing_page}</span>

@@ -1,9 +1,8 @@
 import { useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { onCLS, onINP, onLCP, onTTFB } from 'web-vitals';
-
-const API_BASE = process.env.REACT_APP_API_URL || '';
-const ANALYTICS_ENABLED = API_BASE.length > 0;
+import supabase from '../lib/supabaseClient';
+import { resolveGeo, parseDevice } from '../lib/analyticsUtils';
 
 function getSessionId() {
   const key = 'aura_sid';
@@ -34,22 +33,80 @@ function utmFromSearch(search) {
   };
 }
 
-async function post(path, body) {
-  if (!ANALYTICS_ENABLED) return;
-  try {
-    await fetch(`${API_BASE}${path}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-      keepalive: true
-    });
-  } catch {
-    /* analytics should never break the site */
+async function upsertSession(sessionId, visitorId, path, utm) {
+  const language = navigator.language;
+  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const geo = resolveGeo({ timezone, language });
+  const device = parseDevice(navigator.userAgent);
+  const now = new Date().toISOString();
+
+  const { error } = await supabase
+    .from('sessions')
+    .upsert({
+      id: sessionId,
+      visitor_id: visitorId,
+      started_at: now,
+      last_seen: now,
+      country: geo.country,
+      region: geo.region,
+      device: device.device,
+      browser: device.browser,
+      os: device.os,
+      language,
+      timezone,
+      referrer: document.referrer || '',
+      landing_page: path || '/',
+      utm_source: utm.source,
+      utm_medium: utm.medium,
+      utm_campaign: utm.campaign
+    }, { onConflict: 'id' });
+
+  if (error && error.code !== '23505') {
+    return false;
+  }
+  return true;
+}
+
+async function insertPageView(sessionId, path, title, referrer) {
+  await supabase.from('page_views').insert([{
+    session_id: sessionId,
+    path: String(path).slice(0, 500),
+    title: String(title || '').slice(0, 200),
+    referrer: String(referrer || '').slice(0, 1000)
+  }]);
+}
+
+async function updateHeartbeat(sessionId, path, durationMs) {
+  const now = new Date().toISOString();
+  await supabase.from('sessions').update({ last_seen: now }).eq('id', sessionId);
+
+  if (durationMs && path) {
+    const { data } = await supabase
+      .from('page_views')
+      .select('id, duration_ms')
+      .eq('session_id', sessionId)
+      .eq('path', path)
+      .order('created_at', { ascending: false })
+      .limit(1);
+
+    if (data && data.length > 0) {
+      await supabase
+        .from('page_views')
+        .update({ duration_ms: (data[0].duration_ms || 0) + Math.max(0, Math.min(durationMs, 86400000)) })
+        .eq('id', data[0].id);
+    }
   }
 }
 
-const AnalyticsTracker = () => {
+async function insertEvent(sessionId, name, payload) {
+  await supabase.from('events').insert([{
+    session_id: sessionId,
+    name: String(name).slice(0, 80),
+    payload: payload || {}
+  }]);
+}
 
+const AnalyticsTracker = () => {
   const location = useLocation();
   const lastPath = useRef('');
 
@@ -60,39 +117,27 @@ const AnalyticsTracker = () => {
     if (path === lastPath.current) return;
     lastPath.current = path;
 
-    post('/public/analytics/session', {
-      sessionId,
-      visitorId,
-      path,
-      title: document.title,
-      referrer: document.referrer,
-      language: navigator.language,
-      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-      utm: utmFromSearch(location.search)
+    const utm = utmFromSearch(location.search);
+    upsertSession(sessionId, visitorId, path, utm).then((ok) => {
+      if (ok) {
+        insertPageView(sessionId, path, document.title, document.referrer);
+      }
     });
   }, [location]);
 
   useEffect(() => {
     const sessionId = getSessionId();
     const beat = () => {
-      post('/public/analytics/heartbeat', {
-        sessionId,
-        path: window.location.pathname,
-        durationMs: 15000
-      });
+      updateHeartbeat(sessionId, window.location.pathname, 15000);
     };
     const id = setInterval(beat, 15000);
 
     const sendVital = (metric) => {
-      post('/public/analytics/event', {
-        sessionId,
-        name: 'web-vital',
-        payload: {
-          name: metric.name,
-          value: metric.value,
-          rating: metric.rating,
-          path: window.location.pathname
-        }
+      insertEvent(sessionId, 'web-vital', {
+        name: metric.name,
+        value: metric.value,
+        rating: metric.rating,
+        path: window.location.pathname
       });
     };
 

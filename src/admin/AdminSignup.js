@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import supabase from '../lib/supabaseClient';
 
 const AdminSignup = () => {
   const [name, setName] = useState('');
@@ -8,18 +9,31 @@ const AdminSignup = () => {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
   const handleSignup = async (e) => {
     e.preventDefault();
     setError('');
+    setSuccess('');
     if (password !== confirmPassword) return setError('Passwords do not match.');
     if (password.length < 8) return setError('Password must be at least 8 characters long.');
 
     setLoading(true);
     try {
-      setError('Administrator registration is currently disabled. Use the provisioned admin account or configure server-side provisioning.');
+      const { data, error: signUpError } = await supabase.auth.signUp({
+        email: email.trim().toLowerCase(),
+        password,
+        options: { data: { name } }
+      });
+
+      if (signUpError) throw signUpError;
+
+      setSuccess('Account created. You can now sign in.');
+      setTimeout(() => navigate('/admin/login', { replace: true }), 1500);
+    } catch (err) {
+      setError(err.message || 'Registration failed. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -30,15 +44,16 @@ const AdminSignup = () => {
       <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="max-w-md w-full bg-slate-900 border border-slate-800 p-8 rounded-2xl shadow-2xl">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-extrabold text-white tracking-tight">Create Admin</h1>
-          <p className="text-gray-400 text-sm mt-2">Administrative access is provisioned server-side.</p>
+          <p className="text-gray-400 text-sm mt-2">Register a new administrative account.</p>
         </div>
         {error && <div role="alert" className="p-3.5 mb-6 text-sm text-rose-400 bg-rose-950/40 border border-rose-800/60 rounded-xl text-center">{error}</div>}
+        {success && <div role="alert" className="p-3.5 mb-6 text-sm text-emerald-400 bg-emerald-950/40 border border-emerald-800/60 rounded-xl text-center">{success}</div>}
         <form onSubmit={handleSignup} className="space-y-4">
           <input aria-label="Full Name" type="text" required value={name} onChange={(e) => setName(e.target.value)} className="w-full px-4 py-3 bg-slate-800/80 border border-slate-700 rounded-xl text-white" placeholder="Full Name" />
           <input aria-label="Email Address" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="w-full px-4 py-3 bg-slate-800/80 border border-slate-700 rounded-xl text-white" placeholder="admin@auraofficial.in" />
           <input aria-label="Password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} className="w-full px-4 py-3 bg-slate-800/80 border border-slate-700 rounded-xl text-white" placeholder="Minimum 8 characters" />
           <input aria-label="Confirm Password" type="password" required value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="w-full px-4 py-3 bg-slate-800/80 border border-slate-700 rounded-xl text-white" placeholder="Repeat password" />
-          <button type="submit" disabled={loading} className="w-full py-3.5 px-4 bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-semibold rounded-xl disabled:opacity-50">{loading ? 'Checking...' : 'Request Access'}</button>
+          <button type="submit" disabled={loading} className="w-full py-3.5 px-4 bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-semibold rounded-xl disabled:opacity-50">{loading ? 'Creating...' : 'Create Account'}</button>
         </form>
         <div className="mt-6 text-center text-xs text-gray-400">Already registered? <Link to="/admin/login" className="text-cyan-400 hover:underline font-medium">Sign In</Link></div>
       </motion.div>
