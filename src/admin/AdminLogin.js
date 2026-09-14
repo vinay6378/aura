@@ -16,7 +16,7 @@ const AdminLogin = () => {
     setLoading(true);
 
     try {
-      const data = await apiCall('/api/auth/login', {
+      const data = await apiCall('/auth/login', {
         method: 'POST',
         body: JSON.stringify({ email, password })
       });

@@ -60,7 +60,7 @@ const AnalyticsTracker = () => {
     if (path === lastPath.current) return;
     lastPath.current = path;
 
-    post('/api/public/analytics/session', {
+    post('/public/analytics/session', {
       sessionId,
       visitorId,
       path,
@@ -75,7 +75,7 @@ const AnalyticsTracker = () => {
   useEffect(() => {
     const sessionId = getSessionId();
     const beat = () => {
-      post('/api/public/analytics/heartbeat', {
+      post('/public/analytics/heartbeat', {
         sessionId,
         path: window.location.pathname,
         durationMs: 15000
@@ -84,7 +84,7 @@ const AnalyticsTracker = () => {
     const id = setInterval(beat, 15000);
 
     const sendVital = (metric) => {
-      post('/api/public/analytics/event', {
+      post('/public/analytics/event', {
         sessionId,
         name: 'web-vital',
         payload: {

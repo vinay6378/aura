@@ -11,6 +11,7 @@ import SEO from './components/SEO';
 import ErrorBoundary from './components/ErrorBoundary';
 import Loading from './components/Loading';
 import ProtectedRoute from './admin/ProtectedRoute';
+import AnalyticsTracker from './components/AnalyticsTracker';
 import './styles/index.css';
 
 // Lazy load public pages
@@ -61,6 +62,7 @@ function App() {
     <ErrorBoundary>
       <Suspense fallback={<Loading />}>
         <div className="relative min-h-screen content-overlay">
+          <AnalyticsTracker />
           <Routes>
             {/* Home Route */}
             <Route path="/" element={
