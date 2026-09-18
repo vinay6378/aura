@@ -119,6 +119,9 @@ const AnalyticsTracker = () => {
     lastPath.current = path;
 
     const utm = utmFromSearch(location.search);
+    if (utm.source || utm.medium || utm.campaign) {
+      trackPpcClick({ sessionId, visitorId, path, utm });
+    }
     upsertSession(sessionId, visitorId, path, utm).then((ok) => {
       if (ok) {
         insertPageView(sessionId, path, document.title, document.referrer);
