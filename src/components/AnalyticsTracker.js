@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { onCLS, onINP, onLCP, onTTFB } from 'web-vitals';
 import supabase from '../lib/supabaseClient';
 import { resolveGeo, parseDevice } from '../lib/analyticsUtils';
+import { trackPpcClick } from '../services/adminDataService';
 
 function getSessionId() {
   const key = 'aura_sid';

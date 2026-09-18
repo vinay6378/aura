@@ -1,10 +1,28 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useCallback, useRef, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import supabase from '../lib/supabaseClient';
 import { getContacts, updateContactStatus, deleteContact, getOverviewStats, getLiveVisitors } from '../services/dataService';
 
+const SeoManagement = lazy(() => import('./modules/SeoManagement'));
+const AnalyticsDashboard = lazy(() => import('./modules/AnalyticsDashboard'));
+const ServicesManager = lazy(() => import('./modules/ServicesManager'));
+const MarketingAutomation = lazy(() => import('./modules/MarketingAutomation'));
+const PpcTracker = lazy(() => import('./modules/PpcTracker'));
+const SocialMediaAutomation = lazy(() => import('./modules/SocialMediaAutomation'));
+
 const POLL_INTERVAL = 10000;
 const STATUSES = ['new', 'contacted', 'qualified', 'won', 'closed'];
+
+const TABS = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'analytics', label: 'Analytics Tracker' },
+  { id: 'contacts', label: 'Inquiries & Leads' },
+  { id: 'seo', label: 'SEO Management' },
+  { id: 'services', label: 'Dynamic Services' },
+  { id: 'marketing', label: 'Marketing Automation' },
+  { id: 'ppc', label: 'PPC Tracker' },
+  { id: 'social', label: 'Social Media' }
+];
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
@@ -30,10 +48,7 @@ const AdminDashboard = () => {
 
   const fetchOverview = useCallback(async () => {
     try {
-      const [stats, live] = await Promise.all([
-        getOverviewStats(),
-        getLiveVisitors()
-      ]);
+      const [stats, live] = await Promise.all([getOverviewStats(), getLiveVisitors()]);
       setTotals(stats);
       setLiveVisitors(live);
       const newCount = stats.contacts ?? 0;
@@ -43,7 +58,7 @@ const AdminDashboard = () => {
       }
       setKnownLeadCount(newCount);
       setRealTimeStatus('connected');
-    } catch (err) {
+    } catch {
       setRealTimeStatus('disconnected');
     }
   }, [knownLeadCount]);
@@ -52,7 +67,7 @@ const AdminDashboard = () => {
     try {
       const data = await getContacts(statusFilter);
       setContacts(data || []);
-    } catch (err) {
+    } catch {
       setContacts([]);
     }
   }, [statusFilter]);
@@ -66,11 +81,13 @@ const AdminDashboard = () => {
   useEffect(() => {
     fetchDashboardData();
     pollRef.current = setInterval(() => {
-      fetchOverview();
-      fetchContacts();
+      if (activeTab === 'overview' || activeTab === 'contacts') {
+        fetchOverview();
+        fetchContacts();
+      }
     }, POLL_INTERVAL);
     return () => clearInterval(pollRef.current);
-  }, [fetchDashboardData, fetchOverview, fetchContacts]);
+  }, [fetchDashboardData, fetchOverview, fetchContacts, activeTab]);
 
   const handleStatusChange = async (contactId, newStatus) => {
     setActionLoading(true);
@@ -117,12 +134,8 @@ const AdminDashboard = () => {
     try {
       const csvContent = [
         ['ID', 'Name', 'Email', 'Phone', 'Company', 'Service', 'Subject', 'Status', 'Created At'],
-        ...filteredContacts.map((c) => [
-          c.id, c.name, c.email, c.phone || '', c.company || '',
-          c.service || '', c.subject || '', c.status, c.created_at
-        ])
+        ...filteredContacts.map((c) => [c.id, c.name, c.email, c.phone || '', c.company || '', c.service || '', c.subject || '', c.status, c.created_at])
       ].map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
-
       const blob = new Blob([csvContent], { type: 'text/csv' });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -139,95 +152,64 @@ const AdminDashboard = () => {
 
   const getStatusBadge = (status) => {
     switch (status) {
-      case 'won':
-      case 'closed':
-        return 'bg-emerald-950/70 text-emerald-400 border-emerald-800';
-      case 'contacted':
-      case 'qualified':
-        return 'bg-cyan-950/70 text-cyan-400 border-cyan-800';
-      case 'new':
-      default:
-        return 'bg-rose-950/70 text-rose-400 border-rose-800';
+      case 'won': case 'closed': return 'bg-emerald-950/70 text-emerald-400 border-emerald-800';
+      case 'contacted': case 'qualified': return 'bg-cyan-950/70 text-cyan-400 border-cyan-800';
+      default: return 'bg-rose-950/70 text-rose-400 border-rose-800';
     }
   };
 
   const serviceBreakdown = (() => {
     if (!contacts.length) return [];
     const map = {};
-    contacts.forEach((c) => {
-      const svc = c.service || 'General';
-      map[svc] = (map[svc] || 0) + 1;
-    });
+    contacts.forEach((c) => { const svc = c.service || 'General'; map[svc] = (map[svc] || 0) + 1; });
     return Object.entries(map).map(([service, count]) => ({ service, count }));
   })();
+
+  const renderModule = () => {
+    switch (activeTab) {
+      case 'seo': return <SeoManagement />;
+      case 'analytics': return <AnalyticsDashboard />;
+      case 'services': return <ServicesManager />;
+      case 'marketing': return <MarketingAutomation />;
+      case 'ppc': return <PpcTracker />;
+      case 'social': return <SocialMediaAutomation />;
+      default: return null;
+    }
+  };
 
   return (
     <div className="min-h-screen bg-slate-950 text-white flex flex-col font-sans">
       <header className="bg-slate-900 border-b border-slate-800 px-6 py-4 flex justify-between items-center sticky top-0 z-30">
         <div className="flex items-center space-x-3">
-          <span className="text-xl font-extrabold bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">
-            AURA Digital
-          </span>
-          <span className="text-xs bg-slate-800 text-slate-300 border border-slate-700 px-2 py-0.5 rounded-full font-mono">
-            Control Center
-          </span>
+          <span className="text-xl font-extrabold bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">AURA Digital</span>
+          <span className="text-xs bg-slate-800 text-slate-300 border border-slate-700 px-2 py-0.5 rounded-full font-mono">Control Center</span>
         </div>
         <div className="flex items-center space-x-4">
           <div className="flex items-center space-x-2">
-            <div className={`w-2 h-2 rounded-full ${
-              realTimeStatus === 'connected' ? 'bg-emerald-400 animate-pulse' :
-              realTimeStatus === 'live-update' ? 'bg-yellow-400 animate-pulse' :
-              realTimeStatus === 'connecting' ? 'bg-amber-400 animate-pulse' :
-              'bg-rose-400'
-            }`} />
-            <span className="text-xs text-gray-400">
-              {realTimeStatus === 'connected' ? 'Live' :
-               realTimeStatus === 'live-update' ? 'New lead!' :
-               realTimeStatus === 'connecting' ? 'Connecting...' :
-               'Offline'}
-            </span>
+            <div className={`w-2 h-2 rounded-full ${realTimeStatus === 'connected' ? 'bg-emerald-400 animate-pulse' : realTimeStatus === 'live-update' ? 'bg-yellow-400 animate-pulse' : realTimeStatus === 'connecting' ? 'bg-amber-400 animate-pulse' : 'bg-rose-400'}`} />
+            <span className="text-xs text-gray-400">{realTimeStatus === 'connected' ? 'Live' : realTimeStatus === 'live-update' ? 'New lead!' : realTimeStatus === 'connecting' ? 'Connecting...' : 'Offline'}</span>
           </div>
-          <button
-            onClick={fetchDashboardData}
-            disabled={loading || actionLoading}
-            className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-xs font-medium text-gray-300 rounded-lg transition border border-slate-700"
-          >
-            Refresh
-          </button>
-          <button
-            onClick={handleLogout}
-            className="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold rounded-lg transition"
-          >
-            Sign Out
-          </button>
+          <button onClick={fetchDashboardData} disabled={loading || actionLoading} className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-xs font-medium text-gray-300 rounded-lg transition border border-slate-700">Refresh</button>
+          <button onClick={handleLogout} className="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold rounded-lg transition">Sign Out</button>
         </div>
       </header>
 
       <div className="flex-1 flex flex-col md:flex-row">
-        <aside className="w-full md:w-64 bg-slate-900/40 border-r border-slate-800 p-4 space-y-1">
-          {[
-            { id: 'overview', label: 'Live Statistics' },
-            { id: 'contacts', label: 'Inquiries & Leads' }
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`w-full text-left px-4 py-3 rounded-xl text-sm font-medium transition ${
-                activeTab === tab.id
-                  ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/30'
-                  : 'text-gray-400 hover:bg-slate-800/60 hover:text-white'
-              }`}
-            >
+        <aside className="w-full md:w-64 bg-slate-900/40 border-r border-slate-800 p-4 space-y-1 overflow-y-auto">
+          {TABS.map((tab) => (
+            <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`w-full text-left px-4 py-3 rounded-xl text-sm font-medium transition ${activeTab === tab.id ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/30' : 'text-gray-400 hover:bg-slate-800/60 hover:text-white'}`}>
               {tab.label}
             </button>
           ))}
         </aside>
 
         <main className="flex-1 p-6 md:p-8 overflow-y-auto">
-          {loading ? (
-            <div className="flex items-center justify-center h-64 text-gray-400 text-sm">
-              Loading dashboard data...
-            </div>
+          {activeTab !== 'overview' && activeTab !== 'contacts' ? (
+            <Suspense fallback={<div className="text-gray-400 text-sm">Loading module...</div>}>
+              {renderModule()}
+            </Suspense>
+          ) : loading ? (
+            <div className="flex items-center justify-center h-64 text-gray-400 text-sm">Loading dashboard data...</div>
           ) : (
             <>
               {activeTab === 'overview' && (
@@ -236,7 +218,6 @@ const AdminDashboard = () => {
                     <h2 className="text-2xl font-bold text-white tracking-tight">Performance Overview</h2>
                     <p className="text-gray-400 text-sm mt-1">Real-time data synced every {POLL_INTERVAL / 1000}s</p>
                   </div>
-
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                     <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl">
                       <span className="text-xs uppercase font-semibold text-gray-400">Total Leads</span>
@@ -245,7 +226,6 @@ const AdminDashboard = () => {
                     <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl">
                       <span className="text-xs uppercase font-semibold text-rose-400">New</span>
                       <p className="text-3xl font-extrabold text-rose-400 mt-2">{totals.newLeads || 0}</p>
-                      <p className="text-xs text-gray-500 mt-1">Awaiting review</p>
                     </div>
                     <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl">
                       <span className="text-xs uppercase font-semibold text-cyan-400">Today Views</span>
@@ -256,12 +236,9 @@ const AdminDashboard = () => {
                       <p className="text-3xl font-extrabold text-emerald-400 mt-2">{totals.todayLeads || 0}</p>
                     </div>
                   </div>
-
                   <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
                     <h3 className="text-lg font-bold text-white mb-4">Inquiries by Service</h3>
-                    {serviceBreakdown.length === 0 ? (
-                      <p className="text-gray-500 text-sm">No inquiry records yet.</p>
-                    ) : (
+                    {serviceBreakdown.length === 0 ? <p className="text-gray-500 text-sm">No inquiry records yet.</p> : (
                       <div className="space-y-3">
                         {serviceBreakdown.map((item) => {
                           const pct = totals.contacts > 0 ? Math.round((item.count / totals.contacts) * 100) : 0;
@@ -280,7 +257,6 @@ const AdminDashboard = () => {
                       </div>
                     )}
                   </div>
-
                   {liveVisitors.length > 0 && (
                     <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
                       <h3 className="text-lg font-bold text-white mb-4">Live Visitors</h3>
@@ -296,98 +272,41 @@ const AdminDashboard = () => {
                   )}
                 </div>
               )}
-
               {activeTab === 'contacts' && (
                 <div className="space-y-6">
-                  <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
-                    <div>
-                      <h2 className="text-2xl font-bold text-white tracking-tight">Inbound Inquiries</h2>
-                      <p className="text-gray-400 text-sm mt-1">Manage pipeline and status progression</p>
-                    </div>
+                  <div>
+                    <h2 className="text-2xl font-bold text-white tracking-tight">Inbound Inquiries</h2>
+                    <p className="text-gray-400 text-sm mt-1">Manage pipeline and status progression</p>
                   </div>
-
                   <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                     <div className="flex items-center space-x-4">
-                      <select
-                        value={statusFilter}
-                        onChange={(e) => setStatusFilter(e.target.value)}
-                        className="bg-slate-800 border border-slate-700 text-white text-xs rounded-lg px-3 py-2 focus:outline-none focus:border-cyan-500"
-                      >
+                      <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="bg-slate-800 border border-slate-700 text-white text-xs rounded-lg px-3 py-2 focus:outline-none focus:border-cyan-500">
                         <option value="all">All Inquiries</option>
-                        {STATUSES.map((s) => (
-                          <option key={s} value={s}>{s}</option>
-                        ))}
+                        {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
                       </select>
-                      <input
-                        type="text"
-                        placeholder="Search contacts..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="bg-slate-800 border border-slate-700 text-white text-xs rounded-lg px-3 py-2 focus:outline-none focus:border-cyan-500 w-48"
-                      />
+                      <input type="text" placeholder="Search..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="bg-slate-800 border border-slate-700 text-white text-xs rounded-lg px-3 py-2 focus:outline-none focus:border-cyan-500 w-48" />
                     </div>
-                    <button
-                      onClick={handleExportContacts}
-                      disabled={exportLoading || filteredContacts.length === 0}
-                      className="px-3 py-2 bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-semibold rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
+                    <button onClick={handleExportContacts} disabled={exportLoading || filteredContacts.length === 0} className="px-3 py-2 bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-semibold rounded-lg transition disabled:opacity-50">
                       {exportLoading ? 'Exporting...' : 'Export CSV'}
                     </button>
                   </div>
-
                   <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
                     {filteredContacts.length === 0 ? (
-                      <div className="p-8 text-center text-gray-500 text-sm">
-                        No inquiry records matching this criteria.
-                      </div>
+                      <div className="p-8 text-center text-gray-500 text-sm">No inquiry records matching this criteria.</div>
                     ) : (
                       <div className="overflow-x-auto">
                         <table className="w-full text-left text-sm text-gray-300">
                           <thead className="bg-slate-800/80 text-gray-400 uppercase text-xs">
-                            <tr>
-                              <th className="p-4">Contact</th>
-                              <th className="p-4">Service</th>
-                              <th className="p-4">Message</th>
-                              <th className="p-4">Status</th>
-                              <th className="p-4 text-right">Actions</th>
-                            </tr>
+                            <tr><th className="p-4">Contact</th><th className="p-4">Service</th><th className="p-4">Message</th><th className="p-4">Status</th><th className="p-4 text-right">Actions</th></tr>
                           </thead>
                           <tbody className="divide-y divide-slate-800">
                             {filteredContacts.map((c) => (
                               <tr key={c.id} className="hover:bg-slate-800/40 transition">
-                                <td className="p-4">
-                                  <div className="font-semibold text-white">{c.name}</div>
-                                  <div className="text-xs text-gray-400">{c.email}</div>
-                                  {c.phone && <div className="text-xs text-gray-500">{c.phone}</div>}
-                                </td>
-                                <td className="p-4">
-                                  <span className="text-xs font-mono text-cyan-400">{c.service}</span>
-                                </td>
-                                <td className="p-4 max-w-sm">
-                                  <p className="text-xs text-gray-300 line-clamp-2">{c.message}</p>
-                                  <span className="text-[10px] text-gray-500 mt-1 block">
-                                    {c.created_at ? new Date(c.created_at).toLocaleDateString() : ''}
-                                  </span>
-                                </td>
-                                <td className="p-4">
-                                  <select
-                                    value={c.status}
-                                    onChange={(e) => handleStatusChange(c.id, e.target.value)}
-                                    className={`text-xs border px-2.5 py-1 rounded-lg focus:outline-none bg-slate-950 font-medium ${getStatusBadge(c.status)}`}
-                                  >
-                                    {STATUSES.map((s) => (
-                                      <option key={s} value={s}>{s}</option>
-                                    ))}
-                                  </select>
-                                </td>
-                                <td className="p-4 text-right">
-                                  <button
-                                    onClick={() => handleDeleteContact(c.id)}
-                                    className="text-xs text-rose-400 hover:text-rose-300 font-medium hover:underline"
-                                  >
-                                    Delete
-                                  </button>
-                                </td>
+                                <td className="p-4"><div className="font-semibold text-white">{c.name}</div><div className="text-xs text-gray-400">{c.email}</div>{c.phone && <div className="text-xs text-gray-500">{c.phone}</div>}</td>
+                                <td className="p-4"><span className="text-xs font-mono text-cyan-400">{c.service}</span></td>
+                                <td className="p-4 max-w-sm"><p className="text-xs text-gray-300 line-clamp-2">{c.message}</p><span className="text-[10px] text-gray-500 mt-1 block">{c.created_at ? new Date(c.created_at).toLocaleDateString() : ''}</span></td>
+                                <td className="p-4"><select value={c.status} onChange={(e) => handleStatusChange(c.id, e.target.value)} className={`text-xs border px-2.5 py-1 rounded-lg focus:outline-none bg-slate-950 font-medium ${getStatusBadge(c.status)}`}>{STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}</select></td>
+                                <td className="p-4 text-right"><button onClick={() => handleDeleteContact(c.id)} className="text-xs text-rose-400 hover:text-rose-300 font-medium hover:underline">Delete</button></td>
                               </tr>
                             ))}
                           </tbody>
