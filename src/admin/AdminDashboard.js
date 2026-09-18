@@ -41,8 +41,6 @@ const AdminDashboard = () => {
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    localStorage.removeItem('aura_admin_token');
-    localStorage.removeItem('aura_admin_user');
     navigate('/admin/login');
   };
 

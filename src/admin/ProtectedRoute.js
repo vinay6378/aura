@@ -9,12 +9,7 @@ const ProtectedRoute = ({ children }) => {
     let mounted = true;
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!mounted) return;
-      if (session) {
-        setAuthState('authenticated');
-      } else {
-        const token = localStorage.getItem('aura_admin_token');
-        setAuthState(token ? 'authenticated' : 'unauthenticated');
-      }
+      setAuthState(session ? 'authenticated' : 'unauthenticated');
     });
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {

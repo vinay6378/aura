@@ -24,13 +24,6 @@ const AdminLogin = () => {
       if (signInError) throw signInError;
       if (!data.user) throw new Error('Invalid administrator credentials');
 
-      localStorage.setItem('aura_admin_token', data.session?.access_token || '');
-      localStorage.setItem('aura_admin_user', JSON.stringify({
-        id: data.user.id,
-        email: data.user.email,
-        name: data.user.user_metadata?.name || 'Admin'
-      }));
-
       navigate('/admin', { replace: true });
     } catch (err) {
       setError(err.message || 'Invalid administrator credentials');
