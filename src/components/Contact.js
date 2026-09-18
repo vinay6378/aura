@@ -1,6 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { submitContactForm } from '../services/dataService';
+import supabase from '../lib/supabaseClient';
+
+const DEFAULT_SERVICE_OPTIONS = [
+  'General Inquiry', 'Website Development', 'Software Development', 'Mobile Application',
+  'Data Science & Analytics', 'Social Media Marketing', 'PPC Advertising', 'Content Marketing',
+  'Brand Identity', 'Photo Editing', 'Print Design', 'Business Content', 'Book Publishing'
+];
 
 const Contact = () => {
   const [formData, setFormData] = useState({
@@ -15,6 +22,22 @@ const Contact = () => {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState('');
+  const [serviceOptions, setServiceOptions] = useState(DEFAULT_SERVICE_OPTIONS);
+
+  useEffect(() => {
+    let mounted = true;
+    supabase
+      .from('services')
+      .select('title')
+      .eq('is_active', true)
+      .order('sort_order', { ascending: true })
+      .then(({ data }) => {
+        if (!mounted || !data || data.length === 0) return;
+        const titles = ['General Inquiry', ...data.map((s) => s.title)];
+        setServiceOptions(titles);
+      });
+    return () => { mounted = false; };
+  }, []);
 
   const handleChange = (e) => {
     setFormData({
@@ -160,19 +183,9 @@ const Contact = () => {
                     onChange={handleChange}
                     className="w-full px-4 py-3 rounded-lg bg-white bg-opacity-20 border border-white border-opacity-30 text-white focus:outline-none focus:ring-2 focus:ring-aura-cyan transition-all"
                   >
-                    <option value="General Inquiry">General Inquiry</option>
-                    <option value="Website Development">Website Development</option>
-                    <option value="Software Development">Software Development</option>
-                    <option value="Mobile Application">Mobile Application</option>
-                    <option value="Data Science & Analytics">Data Science & Analytics</option>
-                    <option value="Social Media Marketing">Social Media Marketing</option>
-                    <option value="PPC Advertising">PPC Advertising</option>
-                    <option value="Content Marketing">Content Marketing</option>
-                    <option value="Brand Identity">Brand Identity</option>
-                    <option value="Photo Editing">Photo Editing</option>
-                    <option value="Print Design">Print Design</option>
-                    <option value="Business Content">Business Content</option>
-                    <option value="Book Publishing">Book Publishing</option>
+                    {serviceOptions.map((svc) => (
+                      <option key={svc} value={svc}>{svc}</option>
+                    ))}
                   </select>
                 </div>
 
