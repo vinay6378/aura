@@ -23,6 +23,8 @@ export async function upsertSeoPage(row) {
     schema_json: row.schema_json || null,
     canonical_url: row.canonical_url || '',
     is_indexed: row.is_indexed !== false,
+    focus_keyword: row.focus_keyword || '',
+    og_title: row.og_title || '',
     updated_at: new Date().toISOString()
   };
   const { data, error } = await supabase.from('seo_pages').upsert(payload, { onConflict: 'path' }).select().single();
@@ -63,6 +65,10 @@ export async function upsertService(row) {
     sort_order: row.sort_order || 0,
     meta_title: row.meta_title || '',
     meta_desc: row.meta_desc || '',
+    features: row.features || [],
+    pricing: row.pricing || [],
+    testimonials: row.testimonials || [],
+    image_url: row.image_url || '',
     updated_at: new Date().toISOString()
   };
   const { data, error } = await supabase.from('services').upsert(payload, { onConflict: 'slug' }).select().single();
@@ -90,6 +96,10 @@ export async function upsertMarketingCampaign(row) {
     trigger_event: row.trigger_event || '',
     status: row.status || 'draft',
     config: row.config || {},
+    email_subject: row.email_subject || '',
+    email_body: row.email_body || '',
+    ab_variant_b_subject: row.ab_variant_b_subject || '',
+    ab_variant_b_body: row.ab_variant_b_body || '',
     updated_at: new Date().toISOString()
   };
   if (row.id) {
@@ -124,6 +134,10 @@ export async function upsertPpcCampaign(row) {
     campaign_id: row.campaign_id || '',
     budget: row.budget || 0,
     is_active: row.is_active !== false,
+    spend: row.spend || 0,
+    currency: row.currency || 'INR',
+    target_geo: row.target_geo || 'IN',
+    budget_alert_threshold: row.budget_alert_threshold || 80.0,
     updated_at: new Date().toISOString()
   };
   if (row.id) {
@@ -171,6 +185,7 @@ export async function upsertSocialPost(row) {
     scheduled_at: row.scheduled_at || null,
     status: row.status || 'draft',
     post_url: row.post_url || '',
+    hashtags: row.hashtags || '',
     updated_at: new Date().toISOString()
   };
   if (row.id) {
@@ -331,6 +346,128 @@ export async function getDeviceStats() {
     browsers: Object.entries(browsers).map(([k, v]) => ({ label: k, count: v })).sort((a, b) => b.count - a.count),
     oses: Object.entries(oses).map(([k, v]) => ({ label: k, count: v })).sort((a, b) => b.count - a.count)
   };
+}
+
+// ─── Analytics with custom date range ───
+export async function getAnalyticsOverviewCustom(startDate, endDate) {
+  const start = new Date(startDate).toISOString();
+  const end = new Date(endDate).toISOString();
+
+  const [pageViews, sessions, visitors] = await Promise.all([
+    supabase.from('page_views').select('*', { count: 'exact', head: true }).gte('created_at', start).lte('created_at', end),
+    supabase.from('sessions').select('*', { count: 'exact', head: true }).gte('started_at', start).lte('started_at', end),
+    supabase.from('sessions').select('visitor_id').gte('started_at', start).lte('started_at', end)
+  ]);
+
+  const uniqueVisitors = new Set((visitors.data || []).map((r) => r.visitor_id).filter(Boolean)).size;
+
+  return {
+    pageViews: pageViews.count || 0,
+    sessions: sessions.count || 0,
+    uniqueVisitors
+  };
+}
+
+export async function getPageViewTrendsCustom(startDate, endDate) {
+  const start = new Date(startDate).toISOString();
+  const end = new Date(endDate).toISOString();
+  const { data, error } = await supabase
+    .from('page_views')
+    .select('created_at, path')
+    .gte('created_at', start)
+    .lte('created_at', end)
+    .order('created_at', { ascending: true });
+  if (error) throw new Error(error.message);
+
+  const byDay = {};
+  (data || []).forEach((pv) => {
+    const day = pv.created_at?.slice(0, 10);
+    if (!day) return;
+    if (!byDay[day]) byDay[day] = { date: day, views: 0, uniquePaths: new Set() };
+    byDay[day].views++;
+    byDay[day].uniquePaths.add(pv.path);
+  });
+
+  return Object.values(byDay).map((d) => ({
+    date: d.date,
+    views: d.views,
+    uniquePaths: d.uniquePaths.size
+  }));
+}
+
+export async function getFunnelData() {
+  const { data: sessions, error } = await supabase
+    .from('sessions')
+    .select('id, landing_page')
+    .order('started_at', { ascending: false })
+    .limit(2000);
+  if (error) return [];
+
+  const sessionIds = (sessions || []).map((s) => s.id);
+  if (sessionIds.length === 0) return [];
+
+  const { data: pageViews } = await supabase
+    .from('page_views')
+    .select('session_id, path')
+    .in('session_id', sessionIds);
+
+  const { data: contacts } = await supabase
+    .from('contacts')
+    .select('id');
+
+  const visitedHome = (sessions || []).filter((s) => s.landing_page === '/' || s.landing_page === '').length;
+  const visitedServices = new Set((pageViews || []).filter((pv) => pv.path?.includes('services')).map((pv) => pv.session_id)).size;
+  const visitedContact = new Set((pageViews || []).filter((pv) => pv.path?.includes('contact')).map((pv) => pv.session_id)).size;
+  const submittedForm = (contacts || []).length;
+
+  return [
+    { stage: 'Visited Site', count: visitedHome || sessions.length, pct: 100 },
+    { stage: 'Viewed Services', count: visitedServices, pct: sessions.length > 0 ? Math.round((visitedServices / sessions.length) * 100) : 0 },
+    { stage: 'Viewed Contact', count: visitedContact, pct: sessions.length > 0 ? Math.round((visitedContact / sessions.length) * 100) : 0 },
+    { stage: 'Submitted Form', count: submittedForm, pct: sessions.length > 0 ? Math.round((submittedForm / sessions.length) * 100) : 0 }
+  ];
+}
+
+export async function getGoals() {
+  const { data: contacts, error } = await supabase
+    .from('contacts')
+    .select('id, created_at, status')
+    .order('created_at', { ascending: false })
+    .limit(2000);
+  if (error) return [];
+
+  const total = (contacts || []).length;
+  const won = (contacts || []).filter((c) => c.status === 'won').length;
+  const closed = (contacts || []).filter((c) => c.status === 'closed').length;
+  const newLeads = (contacts || []).filter((c) => c.status === 'new').length;
+
+  return [
+    { label: 'Total Leads', value: total, target: 100, pct: Math.min(100, Math.round((total / 100) * 100)) },
+    { label: 'New Leads', value: newLeads, target: 50, pct: Math.min(100, Math.round((newLeads / 50) * 100)) },
+    { label: 'Won Deals', value: won, target: 20, pct: Math.min(100, Math.round((won / 20) * 100)) },
+    { label: 'Closed Deals', value: closed, target: 15, pct: Math.min(100, Math.round((closed / 15) * 100)) }
+  ];
+}
+
+export function exportToCsv(filename, rows) {
+  if (!rows || rows.length === 0) return;
+  const headers = Object.keys(rows[0]);
+  const csvContent = [
+    headers.join(','),
+    ...rows.map((row) => headers.map((header) => {
+      const val = row[header];
+      if (val === null || val === undefined) return '';
+      const str = typeof val === 'object' ? JSON.stringify(val) : String(val);
+      return `"${str.replace(/"/g, '""')}"`;
+    }).join(','))
+  ].join('\n');
+  const blob = new Blob([csvContent], { type: 'text/csv' });
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  window.URL.revokeObjectURL(url);
 }
 
 // ─── PPC Click Tracking (public, anonymous) ───
